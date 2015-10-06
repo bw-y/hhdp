@@ -1,0 +1,8 @@
+ip:192.168.5.30
+ip:192.168.5.12 passwd:redhat
+ip:192.168.5.13 pkey:/opt/id_rsa
+ip:192.168.5.14 pkey:/opt/id_rsa
+ip:192.168.5.15 passwd:redhat
+ip:192.168.5.16 passwd:redhat
+ip:192.168.5.17 passwd:redhat
+ip:192.168.5.18 passwd:redhat

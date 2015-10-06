@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os, sys, getopt, getpass, ConfigParser
-import paramiko, threading, pexpect, subprocess
+import os, sys, getopt, getpass, paramiko
+import threading, pexpect, subprocess
 from time import strftime, localtime
 
 def usage():
@@ -11,9 +11,8 @@ def usage():
 
 Options:
   -h, --help                     show this help message and exit
-  -i, --install                  show required package 
   -c, --command [comannd_names]  execute command on each node 
-  -f, --file [SRC|DEST]          sync file or directory to every node
+  -f, --file    [SRC|DEST]       sync file or directory to every node
   
 Example:
   -c : 
@@ -32,19 +31,6 @@ Example:
     Exam_4 : dir path different on local and remote
       hhdp -f '/opt/dir1 /opt/dir2'
 '''
-
-
-def installPackage():
-  """ 安装依赖包说明 """
-  package = 'python-paramiko python-iniparse python-crypto python-pexpect'
-  print '''## You need to install some package before using it.
-
-## Ubuntu:
-apt-get -y install %s
-
-## Redhat/CentOS:
-yum -y install %s ''' % (package, package)
-
 
 def hostsHash(hosts_file):
   """ 将传递进来的hosts规则文件内容转换成字典后return """
@@ -191,20 +177,18 @@ def functionRouting(opts, args):
       cmdRoute(v, hosts_dict)  
     elif k in ('-f', '--file'):
       fileSync(v, hosts_dict)
-    elif k in ('-i', '--install'):
-      installPackage()
     elif k in ('-h', '--help'):
       usage()
       sys.exit(0)
     else:
       print 'Ivalid params'
       usage()
-      sys.exit(3)
+      sys.exit(1)
 
 def main(argv):
   """ 简单处理参数后,将有效参数扔给 functionRouting 处理 """
-  short_args = 'c:f:hi'
-  long_args = ['command=', 'file=', 'help', 'install'] 
+  short_args = 'c:f:h'
+  long_args = ['command=', 'file=', 'help'] 
   try:
     opts, args = getopt.getopt(argv[1:], short_args, long_args)
   except getopt.GetoptError, err:
@@ -214,12 +198,10 @@ def main(argv):
   functionRouting(opts, args)
 
 if __name__ == '__main__':
-  conf = '/etc/hdp.cfg'
-  if not os.path.isfile(conf):
-    print "%s invalid configuration file" % conf
+  hosts_file = '/etc/hhdp_hosts'
+  if os.path.isfile(hosts_file):
+    hosts_dict = hostsHash(hosts_file)
+    main(sys.argv)
+  else:
+    print '%s no such file' % hosts_file
     sys.exit(1)
-  cf = ConfigParser.ConfigParser()
-  cf.read(conf)
-  hosts_file = cf.get('basic', 'hosts_file')
-  hosts_dict = hostsHash(hosts_file)
-  main(sys.argv)
