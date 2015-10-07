@@ -40,6 +40,8 @@ def hostsHash(hosts_file):
     file_content = open(hosts_file, "r")
     file_list = file_content.readlines()
     for line in file_list:
+      if line[0] == '#':
+        continue 
       line_id = int(line_id) + 1
       dict_key = 'node_' + str(line_id)
       line = line.split()
@@ -73,7 +75,7 @@ def cmdRun(cmd, ip, port, user, passwd, pkey):
 
 def cmdRoute(cmd, hosts_dict):
   """ 将传递进来的命令应用到传递进来字典的每个ip """
-  threads = []
+  threads = list()
   for key in hosts_dict:
     port = 22
     user = getpass.getuser()
@@ -93,10 +95,13 @@ def cmdRoute(cmd, hosts_dict):
     # cmdRun(cmd, ip, port, user, passwd, pkey) 
     c = threading.Thread(target=cmdRun,args=(cmd, ip, port, user, passwd, pkey))
     threads.append(c)
+
   for t in threads:
-    t.setDaemon(True)
+    #t.setDaemon(True)
     t.start()
-  t.join()
+
+  for t in threads:
+    t.join()
 
 
 def cmdRsync(file_src, file_dest, ip, port, user, passwd, pkey):
