@@ -9,27 +9,22 @@ class Base(object):
     def __init__(self, hosts_file, args):
         self.hosts_file = hosts_file
         self.args = args
-        self.hosts = self.__gen_dict()
+        self.hosts = self.__gen_list()
 
-    def __gen_dict(self):
-        hosts_dict = {}
-        line_id = 0
+    def __gen_list(self):
+        hosts_list = []
         file_content = open(self.hosts_file, "r")
         file_list = file_content.readlines()
         for line in file_list:
             if line[0] == '#':
                 continue
-            line_id = int(line_id) + 1
-            dict_key = 'node_' + str(line_id)
             line = line.split()
+            kv = dict()
             for i in line:
-                try:
-                    type(hosts_dict[dict_key])
-                except KeyError:
-                    hosts_dict[dict_key] = {}
                 h = i.split(':')
-                hosts_dict[dict_key][h[0]] = h[1]
-        return hosts_dict
+                kv[h[0]] = h[1]
+            hosts_list.append(kv)
+        return hosts_list
 
     def run(self):
         print(self.args)
@@ -51,9 +46,10 @@ class DoIt(object):
         base.run()
         if base.hosts:
             print base.hosts
+            print len(base.hosts)
         else:
             print('no such valid line')
 
 if __name__ == '__main__':
-    instance = DoIt('/etc/hosts_list', sys.argv)
+    instance = DoIt('./hosts_list', sys.argv)
     instance.run()
