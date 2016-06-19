@@ -3,7 +3,9 @@
 
 import os
 import sys
+import paramiko
 
+from time import strftime, localtime
 
 class Base(object):
     def __init__(self, hosts_file, args):
@@ -19,8 +21,8 @@ class Base(object):
 
         Options:
           -h : show this help message and exit
-          -c [shell commands] : execute command on each node
-          -f [source|target] : sync file or directory to every node
+          -c [shell commands] : execute command on each remote node
+          -f [source|target] : sync file or directory to each remote node
 
         Example:
           -c :
@@ -29,7 +31,7 @@ class Base(object):
             Exam_2 :
               %s -c 'ip a|grep -q net && echo ok ||echo no'
 
-          -f : [local node] => [other node]
+          -f : [local node] => [each remote node]
             Exam_1 : file path same on local and remote
               %s -f /opt/file
             Exam_2 : file path different on local and remote
@@ -48,8 +50,7 @@ class Base(object):
             "port": "22",
             "user": "root",
             "passwd": "key",
-            "pkey": "/opt/pro/id_rsa"
-
+            "pkey": "/root/.ssh/id_rsa"
         }
         new_list = []
         for line in _list:
@@ -62,6 +63,9 @@ class Base(object):
             if "pkey" not in line:
                 line["pkey"] = default_kv["pkey"]
             if "ip" in line:
+                if line["passwd"] == "key" and not os.path.isfile(line["pkey"]):
+                    print("Warn, %s %s no such file" % (line["ip"], line["pkey"]))
+                    continue
                 line = dict(line, **self.params)
                 new_list.append(line)
         return new_list
@@ -79,6 +83,9 @@ class Base(object):
                 h = i.split(':')
                 kv[h[0]] = h[1]
             hosts_list.append(kv)
+        if not len(hosts_list):
+            print("No such valid line in the %s" % self.hosts_file)
+            self.__help_docs()
         return self.kev_value_check(hosts_list)
 
     def __args_check(self):
@@ -109,10 +116,51 @@ class DoIt(object):
     def __init__(self, _map):
         self.map = _map
         self.ip = _map["ip"]
-        self.port = _map["port"]
+        self.port = int(_map["port"])
         self.user = _map["user"]
         self.passwd = _map["passwd"]
         self.pkey = _map["pkey"]
+
+    def cmd_ctrl(self):
+        ssh_conn = paramiko.SSHClient()
+        ssh_conn.load_system_host_keys()
+        ssh_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        if self.passwd == "key":
+            load_key = paramiko.RSAKey.from_private_key_file(self.pkey)
+            ssh_conn.connect(self.ip, self.port, self.user, pkey=load_key)
+        else:
+            ssh_conn.connect(self.ip, self.port, self.user, self.passwd)
+        stdin, stdout, stderr = ssh_conn.exec_command(str(self.map["cmd"]))
+        sys.stdout.write(stdout.read() + stderr.read())
+        ssh_conn.close()
+
+    def sync_ctrl(self):
+        start_time = '%s => %s:%s ' % (file_src, ip, file_dest) + strftime("%Y/%m/%d %H:%M:%S -> ", localtime())
+        if self.passwd == "key":
+            ssh_args = '"ssh -p %s -i %s -q -o StrictHostKeyChecking=no"' %s (self.port, self.pkey)
+            subprocess.call('%s %s %s %s@%s:%s' % (rsync_cmd, ssh_key_args, file_src, user, ip, file_dest), shell=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            ssh_args = '"ssh -p %s -q -o StrictHostKeyChecking=no"' % self.port
+        rsync_cmd = '/usr/bin/rsync -a -e'
+
+    if passwd == 'key':
+        subprocess.call('%s %s %s %s@%s:%s' % (rsync_cmd, ssh_key_args, file_src, user, ip, file_dest), shell=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    else:
+        pexpect.run('%s %s %s %s@%s:%s' % (rsync_cmd, ssh_pwd_args, file_src, user, ip, file_dest),
+                    events={'password': '%s\n' % passwd})
+        print start_time + strftime("%H:%M:%S", localtime()) + " ok"
+
+
+    def run(self):
+        if "cmd" in self.map:
+            self.cmd_ctrl()
+        elif "src" in self.map:
+            self.sync_ctrl()
+        else:
+            print(self.ip + " do nothing!\n")
+            return
 
 
 class Tools(object):
@@ -137,7 +185,7 @@ class Tools(object):
 
 if __name__ == '__main__':
     instance = Base('./hosts_list', sys.argv)
-    if instance.map_list:
-        print(instance.map_list)
-    else:
-        print("no such vaild line")
+    for i in instance.map_list:
+        get_work = DoIt(i)
+        get_work.run()
+
