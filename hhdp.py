@@ -9,43 +9,9 @@ class Base(object):
     def __init__(self, hosts_file, args):
         self.hosts_file = hosts_file
         self.args = args
-        self.hosts = self.__gen_list()
-
-    @staticmethod
-    def kev_value_check(_list):
-        if not len(_list):
-            return 1
-        new_list = []
-        for line in _list:
-            print line
-            new_list.append(line)
-        return new_list
-
-    def __gen_list(self):
-        hosts_list = []
-        file_content = open(self.hosts_file, "r")
-        file_list = file_content.readlines()
-        for line in file_list:
-            if line[0] == '#':
-                continue
-            line = line.split()
-            kv = dict()
-            for i in line:
-                h = i.split(':')
-                kv[h[0]] = h[1]
-            hosts_list.append(kv)
-        return Base.kev_value_check(hosts_list)
-
-    def run(self):
-        print(self.hosts_file)
-
-
-class DoIt(object):
-    def __init__(self, hosts_file, args):
-        self.hosts_file = hosts_file
-        self.args = args
         self.size = len(args)
-        self.__args_check()
+        self.params = self.__args_check()
+        self.map_list = self.__gen_list()
 
     def __help_docs(self):
         n = self.args[0]
@@ -72,41 +38,106 @@ class DoIt(object):
               %s -f /opt/dir
             Exam_4 : dir path different on local and remote
               %s -f /opt/dir1 /opt/dir2
-        """ % (n, n, n, n, n, n, n))
+        \n""" % (n, n, n, n, n, n, n))
+        sys.exit(1)
+
+    def kev_value_check(self, _list):
+        if not len(_list):
+            return
+        default_kv = {
+            "port": "22",
+            "user": "root",
+            "passwd": "key",
+            "pkey": "/opt/pro/id_rsa"
+
+        }
+        new_list = []
+        for line in _list:
+            if "port" not in line:
+                line["port"] = default_kv["port"]
+            if "user" not in line:
+                line["user"] = default_kv["user"]
+            if "passwd" not in line:
+                line["passwd"] = default_kv["passwd"]
+            if "pkey" not in line:
+                line["pkey"] = default_kv["pkey"]
+            if "ip" in line:
+                line = dict(line, **self.params)
+                new_list.append(line)
+        return new_list
+
+    def __gen_list(self):
+        hosts_list = []
+        file_content = open(self.hosts_file, "r")
+        file_list = file_content.readlines()
+        for line in file_list:
+            if line[0] == '#':
+                continue
+            line = line.split()
+            kv = dict()
+            for i in line:
+                h = i.split(':')
+                kv[h[0]] = h[1]
+            hosts_list.append(kv)
+        return self.kev_value_check(hosts_list)
 
     def __args_check(self):
         if not os.path.isfile(self.hosts_file):
             sys.stdout.write("%s no such file\n" % self.hosts_file)
-            sys.exit(1)
+            self.__help_docs()
+        _args = {}
         if self.args[1] == "-c":
             if self.size == 2:
-                print("hostname")
+                _args["cmd"] = "hostname"
             elif self.size == 3:
-                print(self.args[2])
+                _args["cmd"] = self.args[2]
             else:
                 self.__help_docs()
         elif self.args[1] == "-f":
-            sync_path = self.args[2:]
             if self.size == 4:
-                print(sync_path)
+                _args = Tools.check_path(self.args[2], self.args[3])
             elif self.size == 3:
-                sync_path.append(sync_path[0])
-                print(sync_path)
+                _args = Tools.check_path(self.args[2], self.args[2])
             else:
                 self.__help_docs()
-        elif self.args[0] == "-h":
+        if not len(_args):
             self.__help_docs()
-        else:
-            self.__help_docs()
+        return _args
 
-    def run(self):
-        base = Base(self.hosts_file, self.args)
-        base.run()
-        if base.hosts:
-            print base.hosts
+
+class DoIt(object):
+    def __init__(self, _map):
+        self.map = _map
+        self.ip = _map["ip"]
+        self.port = _map["port"]
+        self.user = _map["user"]
+        self.passwd = _map["passwd"]
+        self.pkey = _map["pkey"]
+
+
+class Tools(object):
+    @staticmethod
+    def check_dir(_dir):
+        if _dir[-1] != '/':
+            return _dir + '/'
         else:
-            print('no such valid line')
+            return _dir
+
+    @staticmethod
+    def check_path(_src, _dst):
+        _res = {}
+        if os.path.isfile(_src) and _dst[-1] != "/":
+            _res["src"] = _src
+            _res["dst"] = _dst
+        elif os.path.isdir(_src):
+            _res["src"] = Tools.check_dir(_src)
+            _res["dst"] = Tools.check_dir(_dst)
+        return _res
+
 
 if __name__ == '__main__':
-    instance = DoIt('./hosts_list', sys.argv)
-    instance.run()
+    instance = Base('./hosts_list', sys.argv)
+    if instance.map_list:
+        print(instance.map_list)
+    else:
+        print("no such vaild line")
