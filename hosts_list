@@ -1,2 +1,2 @@
-ip:127.0.0.1 passwd:key
-ip:192.168.199.128 passwd:redhat
+ip:127.0.0.1 passwd:redhat
+#ip:192.168.199.128 passwd:redhat

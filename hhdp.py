@@ -6,6 +6,9 @@ import sys
 import paramiko
 
 from time import strftime, localtime
+from subprocess import Popen, PIPE
+from pexpect import spawn
+
 
 class Base(object):
     def __init__(self, hosts_file, args):
@@ -135,23 +138,30 @@ class DoIt(object):
         ssh_conn.close()
 
     def sync_ctrl(self):
-        start_time = '%s => %s:%s ' % (file_src, ip, file_dest) + strftime("%Y/%m/%d %H:%M:%S -> ", localtime())
+        _user = self.user
+        _ip = self.ip
+        _src = self.map["src"]
+        _dst = self.map["dst"]
+        _start = "%s => %s:%s %s -> " % (_src, self.ip, _dst, Tools.now_time())
+        _cmd = "/usr/bin/rsync -a -e"
+        sys.stdout.write(_start)
         if self.passwd == "key":
-            ssh_args = '"ssh -p %s -i %s -q -o StrictHostKeyChecking=no"' %s (self.port, self.pkey)
-            subprocess.call('%s %s %s %s@%s:%s' % (rsync_cmd, ssh_key_args, file_src, user, ip, file_dest), shell=True,
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            _args = '"ssh -p %s -i %s -q -o StrictHostKeyChecking=no"' % (self.port, self.pkey)
+            sync_cmd = Popen("%s %s %s %s@%s:%s" % (_cmd, _args, _src, _user, _ip, _dst), shell=True, stderr=PIPE)
+            sync_cmd.wait()
+            if sync_cmd.returncode == 0:
+                sys.stdout.write("%s ok\n" % Tools.now_time())
+            else:
+                sys.stdout.write("%s failed\n" % Tools.now_time())
+                sys.stdout.write(sync_cmd.stderr.read())
         else:
-            ssh_args = '"ssh -p %s -q -o StrictHostKeyChecking=no"' % self.port
-        rsync_cmd = '/usr/bin/rsync -a -e'
-
-    if passwd == 'key':
-        subprocess.call('%s %s %s %s@%s:%s' % (rsync_cmd, ssh_key_args, file_src, user, ip, file_dest), shell=True,
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    else:
-        pexpect.run('%s %s %s %s@%s:%s' % (rsync_cmd, ssh_pwd_args, file_src, user, ip, file_dest),
-                    events={'password': '%s\n' % passwd})
-        print start_time + strftime("%H:%M:%S", localtime()) + " ok"
-
+            _args = '"ssh -p %s -q -o StrictHostKeyChecking=no"' % self.port
+            sync_cmd = spawn("%s %s %s %s@%s:%s" % (_cmd, _args, _src, _user, _ip, _dst),
+                             timeout=5, ignore_sighup=False)
+            sync_cmd.waitnoecho()
+            sync_cmd.sendline("%s\n" % self.passwd)
+            print sync_cmd.exitstatus
+            # run('%s %s %s %s@%s:%s' % (_cmd, _args, _src, _user, _ip, _dst), events={'password': '%s\n' % self.passwd})
 
     def run(self):
         if "cmd" in self.map:
@@ -164,6 +174,10 @@ class DoIt(object):
 
 
 class Tools(object):
+    @staticmethod
+    def now_time():
+        return strftime("%Y/%m/%d %H:%M:%S", localtime())
+
     @staticmethod
     def check_dir(_dir):
         if _dir[-1] != '/':
