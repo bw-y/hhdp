@@ -7,7 +7,7 @@ import paramiko
 
 from time import strftime, localtime
 from subprocess import Popen, PIPE
-from pexpect import spawn
+from pexpect import run as prun
 
 
 class Base(object):
@@ -137,6 +137,14 @@ class DoIt(object):
         sys.stdout.write(stdout.read() + stderr.read())
         ssh_conn.close()
 
+    @staticmethod
+    def sync_ctrl_fail_info(_code, _info="Nothing"):
+        if int(_code) == 0:
+            sys.stdout.write("%s ok\n" % Tools.now_time())
+        else:
+            sys.stdout.write("%s failed\n" % Tools.now_time())
+            sys.stdout.write(_info + "\n")
+
     def sync_ctrl(self):
         _user = self.user
         _ip = self.ip
@@ -149,19 +157,12 @@ class DoIt(object):
             _args = '"ssh -p %s -i %s -q -o StrictHostKeyChecking=no"' % (self.port, self.pkey)
             sync_cmd = Popen("%s %s %s %s@%s:%s" % (_cmd, _args, _src, _user, _ip, _dst), shell=True, stderr=PIPE)
             sync_cmd.wait()
-            if sync_cmd.returncode == 0:
-                sys.stdout.write("%s ok\n" % Tools.now_time())
-            else:
-                sys.stdout.write("%s failed\n" % Tools.now_time())
-                sys.stdout.write(sync_cmd.stderr.read())
+            self.sync_ctrl_fail_info(sync_cmd.returncode, sync_cmd.stderr.read())
         else:
             _args = '"ssh -p %s -q -o StrictHostKeyChecking=no"' % self.port
-            sync_cmd = spawn("%s %s %s %s@%s:%s" % (_cmd, _args, _src, _user, _ip, _dst),
-                             timeout=5, ignore_sighup=False)
-            sync_cmd.waitnoecho()
-            sync_cmd.sendline("%s\n" % self.passwd)
-            print sync_cmd.exitstatus
-            # run('%s %s %s %s@%s:%s' % (_cmd, _args, _src, _user, _ip, _dst), events={'password': '%s\n' % self.passwd})
+            _command = '%s %s %s %s@%s:%s' % (_cmd, _args, _src, _user, _ip, _dst)
+            (_output, _return_code) = prun(_command, withexitstatus=True, events={'password': '%s\n' % self.passwd})
+            self.sync_ctrl_fail_info(_return_code, _output)
 
     def run(self):
         if "cmd" in self.map:
