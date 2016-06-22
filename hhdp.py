@@ -13,6 +13,17 @@ from pexpect import run as prun
 
 
 class Base(object):
+    """ 基础类.
+
+    此类的作用为读取列表文件,确认有效性行,生成一个列表.
+
+    属性:
+        hosts_file: 列表文件路径.
+        args: 传递进来的所有命令行参数.
+        size: 传递进来的命令行参数的个数(空格分割).
+        params: 具体使用的有效参数.
+        map_list: 列表文件最终会生成的有效列表数据.
+    """
     def __init__(self, hosts_file, args):
         self.hosts_file = hosts_file
         self.args = args
@@ -21,6 +32,7 @@ class Base(object):
         self.map_list = self.__gen_list()
 
     def __help_docs(self):
+        """ 帮助文档,参数不识别或错误时执行. """
         n = self.args[0]
         sys.stdout.write("""Usage: %s [options] params
 
@@ -49,6 +61,16 @@ class Base(object):
         sys.exit(1)
 
     def kev_value_check(self, _list):
+        """ 列表完整性处理方法.
+
+        此方法将已经根据列表文件生成的列表数据中的默认值补全.
+
+        Arg:
+            _list: 原始列表数据.
+
+        Return:
+            补全后的完成列表.
+        """
         if not len(_list):
             return
         default_kv = {
@@ -76,6 +98,7 @@ class Base(object):
         return new_list
 
     def __gen_list(self):
+        """ 读取列表文件生成一个有效列表变量并返回. """
         hosts_list = []
         file_content = open(self.hosts_file, "r")
         file_list = file_content.readlines()
@@ -94,6 +117,7 @@ class Base(object):
         return self.kev_value_check(hosts_list)
 
     def __args_check(self):
+        """ 检查参数,并返回处理后的有效参数,参数无效时输出帮助并退出. """
         if not os.path.isfile(self.hosts_file):
             sys.stdout.write("%s no such file\n" % self.hosts_file)
             self.__help_docs()
@@ -118,7 +142,33 @@ class Base(object):
 
 
 class DoIt(object):
-    _output_lock = Lock()
+    """ 工作类.
+
+    此类接收一个dict变量,根据其中的有效关键字和值,
+    进行命令或文件的同步动作.
+
+    属性:
+        _map: 一个包含有足够信息的字典,
+        此字典变量应该包含的信息应为如下两种:
+            1. {
+                "ip":"ip或主机名",
+                "port":"端口",
+                "user":"用户名",
+                "passwd":"密码",
+                "pkey": "ssh私钥路径",
+                "cmd": "命令行传递的shell命令"
+                }
+            2. {
+                "ip":"ip或主机名",
+                "port":"端口",
+                "user":"用户名",
+                "passwd":"密码",
+                "pkey": "ssh私钥路径",
+                "src": "命令行-f后面,以空格隔开的第一个路径",
+                "dst": "命令行-f后面,以空格隔开的第二个路径,如果无则为第一个路径"
+                }
+    """
+    _output_lock = Lock()   # 标准输出锁,并发时,不加锁会导致屏幕输出混乱
 
     def __init__(self, _map):
         self.map = _map
@@ -130,11 +180,13 @@ class DoIt(object):
 
     @staticmethod
     def _output(_msg):
+        """ 用于给标准输出加锁的方法, 线程任务输出时应调用此方法. """
         if DoIt._output_lock.acquire():
             sys.stdout.write(_msg)
             DoIt._output_lock.release()
 
     def cmd_ctrl(self):
+        """ 命令执行方法. """
         ssh_conn = paramiko.SSHClient()
         ssh_conn.load_system_host_keys()
         ssh_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -157,6 +209,7 @@ class DoIt(object):
 
     @staticmethod
     def sync_ctrl_fail_info(_code, _info="Nothing", _start="Nothing"):
+        """ 文件同步方法的输出方法(复用和加锁). """
         if DoIt._output_lock.acquire():
             if int(_code) == 0:
                 sys.stdout.write("%s %s ok\n" % (_start, Tools.now_time()))
@@ -166,6 +219,7 @@ class DoIt(object):
             DoIt._output_lock.release()
 
     def sync_ctrl(self):
+        """ 文件同步方法. """
         _user = self.user
         _ip = self.ip
         _src = self.map["src"]
@@ -184,6 +238,7 @@ class DoIt(object):
             self.sync_ctrl_fail_info(_return_code, _output, _start)
 
     def run(self):
+        """ 启动方法. """
         if "cmd" in self.map:
             self.cmd_ctrl()
         elif "src" in self.map:
@@ -231,16 +286,12 @@ class WorkManager(object):
             return list_len
 
     def __init_thread_pool(self):
-        """初始化工作线程池.
-
-        初始化时,会直接执行对应Work实例.
-        """
+        """ 初始化工作线程池. """
         for i in range(self.thread_pool_size):
             self.threads_list.append(Work(self.work_queue, self.base))
 
     def __init_work_queue(self):
-        """初始化有效队列总长度.
-        """
+        """ 初始化有效队列总长度. """
         for i in self.base.map_list:
             self.add_job(self.job, i)
 
@@ -274,11 +325,7 @@ class WorkManager(object):
         return self.work_queue.qsize()
 
     def wait_all_complete(self):
-        """等待所有队列完成.
-
-        Return:
-            无.
-        """
+        """ 等待所有队列完成. """
         for i in self.threads_list:
             if i.isAlive():
                 i.join()
@@ -304,8 +351,7 @@ class Work(Thread):
         self.start()
 
     def run(self):
-        """执行任务直到队列为空.
-        """
+        """ 执行任务直到队列为空. """
         while True:
             if Work._thread_lock.acquire():
                 if self.work_queue.empty():
@@ -320,10 +366,12 @@ class Work(Thread):
 class Tools(object):
     @staticmethod
     def now_time():
+        """ 返回固定格式的当前时间. """
         return strftime("%Y/%m/%d %H:%M:%S", localtime())
 
     @staticmethod
     def check_dir(_dir):
+        """ 确保路径的最后一个字符串为斜杠并返回. """
         if _dir[-1] != '/':
             return _dir + '/'
         else:
@@ -331,6 +379,14 @@ class Tools(object):
 
     @staticmethod
     def check_path(_src, _dst):
+        """ 确认本地和远程路径的有效性.
+
+        Arg:
+            _src: 本地路径
+            _dst: 远程路径
+        Return:
+            返回一个字典变量,其中包含两个有效的键: src 和 dst.
+        """
         _res = {}
         if os.path.isfile(_src) and _dst[-1] != "/":
             _res["src"] = _src
@@ -342,7 +398,7 @@ class Tools(object):
 
 
 if __name__ == '__main__':
-    instance = Base('./hosts_list', sys.argv)
+    instance = Base('/etc/hosts_list', sys.argv)
     work_manager = WorkManager(instance, 8)
     work_manager.wait_all_complete()
 

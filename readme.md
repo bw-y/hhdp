@@ -6,13 +6,13 @@
 2. [描述](#描述)
 3. [安装说明](#安装说明)
 4. [使用说明](#使用说明)
-  *  主机列表文件(/etc/hhdp_hosts)格式说明
+  *  主机列表文件(/etc/hosts_list)格式说明
   *  命令具体使用
 5. [目前问题和其它说明](#目前问题和其它说明)
 
 ## 简介
 
-  hhdp是一个用来在多个linux节点上并发执行shell命令和顺序同步文件或目录的一个小工具
+####  hhdp是一个用来在多个linux节点上并发执行shell命令和同步文件或目录的一个小工具
 
 ## 描述
 
@@ -23,16 +23,16 @@
 
 ```
 1. 安装依赖包:
-  ubuntu:
-    apt-get -y install rsync python-paramiko python-iniparse python-crypto python-pexpect
-  redhat/redhat:
-    yum -y install rsync python-paramiko python-iniparse python-crypto python-pexpect
+  Ubuntu:
+    apt-get -y install rsync python-paramiko python-pexpect
+  Redhat/CentOS:
+    yum -y install rsync python-paramiko python-pexpect
 2. 获取代码:
   git clone https://github.com/bw-y/hhdp.git
-  chmod 755 hhdp/hhdp.py
-  mv hhdp /usr/local/
-3. 创建主机列表文件:/etc/hhdp_hosts
-  touch /etc/hhdp_hosts # 文件内容说明见下文
+  chmod 755 hhdp.py && mkdir -v /usr/local/hhdp
+  mv hhdp.py /usr/local/hhdp/
+3. 创建主机列表文件:/etc/hosts_list
+  touch /etc/hosts_list # 文件内容说明见下文
 4. 创建链接:
   ln -sv /usr/local/hhdp/hhdp.py /usr/bin/hhdp
 ```
@@ -101,7 +101,7 @@ docker
 /opt/file1 => 192.168.5.15:/opt/file1 2015/10/07 00:06:28 -> 00:06:31 ok
 
 例4. 将本地文件/opt/file1同步到每个节点的/tmp/file2
-# hhdp -f '/opt/file1 /tmp/file2'
+# hhdp -f /opt/file1 /tmp/file2
 /opt/file1 => 192.168.5.18:/tmp/file2 2015/10/07 00:07:42 -> 00:07:45 ok
 /opt/file1 => 192.168.5.17:/tmp/file2 2015/10/07 00:07:45 -> 00:07:50 ok
 /opt/file1 => 192.168.5.16:/tmp/file2 2015/10/07 00:07:50 -> 00:07:53 ok
@@ -123,19 +123,12 @@ docker b2c08b9857557daeb960752600c0cc91  /tmp/file2
 
 
 例7. 将本地目录/opt/dir同步到每个节点的/tmp/dir目录
-# hhdp -f '/opt/dir /tmp/dir'
+# hhdp -f /opt/dir /tmp/dir
 /opt/dir/ => 192.168.5.18:/tmp/dir/ 2015/10/07 00:14:08 -> 00:14:11 ok
 /opt/dir/ => 192.168.5.17:/tmp/dir/ 2015/10/07 00:14:11 -> 00:14:14 ok
 /opt/dir/ => 192.168.5.16:/tmp/dir/ 2015/10/07 00:14:14 -> 00:14:18 ok
 /opt/dir/ => 192.168.5.15:/tmp/dir/ 2015/10/07 00:14:18 -> 00:14:21 ok
 ```
 
-## 目前问题和其它说明
-
-1. 考虑在节点数量多时,并发数量约束
-  * 返回dict的数量,方式为文本,但考虑后期数据库(查询量的)问题
-2. 线程超时相关文档传送门: [paramiko](http://docs.paramiko.org/en/1.15/)
-3. 文件同步
-  * 多线程下和pexpect的冲突问题,因此目前暂时为顺序同步
-  * 目前文件分割默认为空格,后续考虑长参数指定方式
-
+## 目前问题
+### 线程数量过多会导致SSH相关异常,目前暂未找到更好的解决方法.
