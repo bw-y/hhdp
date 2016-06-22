@@ -343,6 +343,6 @@ class Tools(object):
 
 if __name__ == '__main__':
     instance = Base('./hosts_list', sys.argv)
-    work_manager = WorkManager(instance, 20)
+    work_manager = WorkManager(instance, 8)
     work_manager.wait_all_complete()
 
