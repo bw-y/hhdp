@@ -5,8 +5,10 @@ import os
 import sys
 import paramiko
 
-from time import strftime, localtime
 from subprocess import Popen, PIPE
+from time import strftime, localtime
+from threading import Thread, Lock
+from Queue import Queue
 from pexpect import run as prun
 
 
@@ -116,6 +118,8 @@ class Base(object):
 
 
 class DoIt(object):
+    _output_lock = Lock()
+
     def __init__(self, _map):
         self.map = _map
         self.ip = _map["ip"]
@@ -124,45 +128,60 @@ class DoIt(object):
         self.passwd = _map["passwd"]
         self.pkey = _map["pkey"]
 
+    @staticmethod
+    def _output(_msg):
+        if DoIt._output_lock.acquire():
+            sys.stdout.write(_msg)
+            DoIt._output_lock.release()
+
     def cmd_ctrl(self):
         ssh_conn = paramiko.SSHClient()
         ssh_conn.load_system_host_keys()
         ssh_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         if self.passwd == "key":
             load_key = paramiko.RSAKey.from_private_key_file(self.pkey)
-            ssh_conn.connect(self.ip, self.port, self.user, pkey=load_key)
+            try:
+                ssh_conn.connect(self.ip, self.port, self.user, pkey=load_key)
+            except paramiko.SSHException:
+                self._output("%s ssh connect failed\n" % self.ip)
+                return
         else:
-            ssh_conn.connect(self.ip, self.port, self.user, self.passwd)
+            try:
+                ssh_conn.connect(self.ip, self.port, self.user, self.passwd)
+            except paramiko.SSHException:
+                self._output("%s ssh connect failed\n" % self.ip)
+                return
         stdin, stdout, stderr = ssh_conn.exec_command(str(self.map["cmd"]))
-        sys.stdout.write(stdout.read() + stderr.read())
+        self._output(stdout.read() + stderr.read())
         ssh_conn.close()
 
     @staticmethod
-    def sync_ctrl_fail_info(_code, _info="Nothing"):
-        if int(_code) == 0:
-            sys.stdout.write("%s ok\n" % Tools.now_time())
-        else:
-            sys.stdout.write("%s failed\n" % Tools.now_time())
-            sys.stdout.write(_info + "\n")
+    def sync_ctrl_fail_info(_code, _info="Nothing", _start="Nothing"):
+        if DoIt._output_lock.acquire():
+            if int(_code) == 0:
+                sys.stdout.write("%s %s ok\n" % (_start, Tools.now_time()))
+            else:
+                sys.stdout.write("%s %s failed\n" % (_start, Tools.now_time()))
+                sys.stdout.write(_info + "\n")
+            DoIt._output_lock.release()
 
     def sync_ctrl(self):
         _user = self.user
         _ip = self.ip
         _src = self.map["src"]
         _dst = self.map["dst"]
-        _start = "%s => %s:%s %s -> " % (_src, self.ip, _dst, Tools.now_time())
+        _start = "%s => %s:%s %s ->" % (_src, self.ip, _dst, Tools.now_time())
         _cmd = "/usr/bin/rsync -a -e"
-        sys.stdout.write(_start)
         if self.passwd == "key":
             _args = '"ssh -p %s -i %s -q -o StrictHostKeyChecking=no"' % (self.port, self.pkey)
             sync_cmd = Popen("%s %s %s %s@%s:%s" % (_cmd, _args, _src, _user, _ip, _dst), shell=True, stderr=PIPE)
             sync_cmd.wait()
-            self.sync_ctrl_fail_info(sync_cmd.returncode, sync_cmd.stderr.read())
+            self.sync_ctrl_fail_info(sync_cmd.returncode, sync_cmd.stderr.read(), _start)
         else:
             _args = '"ssh -p %s -q -o StrictHostKeyChecking=no"' % self.port
             _command = '%s %s %s %s@%s:%s' % (_cmd, _args, _src, _user, _ip, _dst)
             (_output, _return_code) = prun(_command, withexitstatus=True, events={'password': '%s\n' % self.passwd})
-            self.sync_ctrl_fail_info(_return_code, _output)
+            self.sync_ctrl_fail_info(_return_code, _output, _start)
 
     def run(self):
         if "cmd" in self.map:
@@ -170,8 +189,132 @@ class DoIt(object):
         elif "src" in self.map:
             self.sync_ctrl()
         else:
-            print(self.ip + " do nothing!\n")
+            self._output(self.ip + " do nothing!\n")
             return
+
+
+class WorkManager(object):
+    """线程池管理类.
+
+    用于初始化有效队列长度,线程池大小,
+    并等待线程结束.
+
+    属性:
+        base: 基础类(Base)的实例对象
+        work_queue: 初始化一个长度为0的队列.
+        threads: 具体工作线程的列表.
+        thread_pool_size: 工作线程池的大小.
+    """
+    def __init__(self, base_object, threads=5):
+        self.base = base_object
+        self.threads = threads
+        self.work_queue = Queue()
+        self.threads_list = []
+        self.thread_pool_size = self.__thread_pool_size()
+        self.__init_work_queue()
+        self.__init_thread_pool()
+
+    def __thread_pool_size(self):
+        """简单计算需要线程池大小方法.
+
+        如果当前有效上传列表的行数大于或登陆配置文件中线程数量,
+        则以配置文件中的线程数量为准; 反之,则使用上传列表的个数
+        为并发上传的个数.
+
+        Return:
+            返回一个大于0的有效数字.
+        """
+        list_len = len(self.base.map_list)
+        if list_len >= self.threads:
+            return self.threads
+        else:
+            return list_len
+
+    def __init_thread_pool(self):
+        """初始化工作线程池.
+
+        初始化时,会直接执行对应Work实例.
+        """
+        for i in range(self.thread_pool_size):
+            self.threads_list.append(Work(self.work_queue, self.base))
+
+    def __init_work_queue(self):
+        """初始化有效队列总长度.
+        """
+        for i in self.base.map_list:
+            self.add_job(self.job, i)
+
+    def add_job(self, func, arg):
+        """添加具体任务方法到处理队列.
+
+        Args:
+            func: 具体执行任务的方法.
+            arg: 具体执行任务方法所需参数.
+        """
+        self.work_queue.put((func, arg))
+
+    @staticmethod
+    def job(_line):
+        """执行具体的任务.
+
+        其实就是把上传列表遍历并传递给DfsCtrl的对象.
+
+        Args:
+            _line: 当前需要处理的行.
+        """
+        up_thread = DoIt(_line)
+        up_thread.run()
+
+    def check_queue(self):
+        """检查队列长度.
+
+        Return:
+            返回当前队列的有效长度.
+        """
+        return self.work_queue.qsize()
+
+    def wait_all_complete(self):
+        """等待所有队列完成.
+
+        Return:
+            无.
+        """
+        for i in self.threads_list:
+            if i.isAlive():
+                i.join()
+
+
+class Work(Thread):
+    """工作类.
+
+    线程池的某个线程的工作过程控制, 譬如thread-n;
+    每执行完成当前任务, 就会被再次问队列取一个再次执行.
+
+    属性:
+        _thread_lock: 线程锁,获取新任务时避免可能产生的竞争问题.
+        base: 引用基础类的实例化对象
+        work_queue: 任务队列总长度
+    """
+    _thread_lock = Lock()
+
+    def __init__(self, work_queue, base_object):
+        Thread.__init__(self)
+        self.base = base_object
+        self.work_queue = work_queue
+        self.start()
+
+    def run(self):
+        """执行任务直到队列为空.
+        """
+        while True:
+            if Work._thread_lock.acquire():
+                if self.work_queue.empty():
+                    Work._thread_lock.release()
+                    break
+                do, args = self.work_queue.get(False)
+                Work._thread_lock.release()
+                do(args)
+                self.work_queue.task_done()
 
 
 class Tools(object):
@@ -200,7 +343,6 @@ class Tools(object):
 
 if __name__ == '__main__':
     instance = Base('./hosts_list', sys.argv)
-    for i in instance.map_list:
-        get_work = DoIt(i)
-        get_work.run()
+    work_manager = WorkManager(instance, 20)
+    work_manager.wait_all_complete()
 
