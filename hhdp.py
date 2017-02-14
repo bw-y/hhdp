@@ -4,6 +4,7 @@
 import os
 import sys
 import paramiko
+import logging
 
 from subprocess import Popen, PIPE
 from time import strftime, localtime
@@ -11,6 +12,8 @@ from threading import Thread, Lock
 from Queue import Queue
 from pexpect import run as prun
 
+
+logging.basicConfig()
 
 class Base(object):
     """ 基础类.
@@ -399,6 +402,5 @@ class Tools(object):
 
 if __name__ == '__main__':
     instance = Base('/etc/hosts_list', sys.argv)
-    work_manager = WorkManager(instance, 8)
+    work_manager = WorkManager(instance, 15)
     work_manager.wait_all_complete()
-
