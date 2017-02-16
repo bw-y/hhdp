@@ -27,6 +27,16 @@
     apt-get -y install rsync python-paramiko python-pexpect
   Redhat/CentOS:
     yum -y install rsync python-paramiko python-pexpect
+  低版本向高版本兼容：
+  * 安装最新pip:
+  curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py; python get-pip.py
+  * 安装库文件:
+  Ubuntu:
+    apt-get install build-essential libssl-dev libffi-dev python-dev
+  Redhat/CentOs:
+    yum install gcc libffi-devel python-devel openssl-devel
+  * 安装paramiko  
+    pip install paramiko
 2. 获取代码:
   git clone https://github.com/bw-y/hhdp.git
   chmod 755 hhdp.py && mkdir -v /usr/local/hhdp
