@@ -6,7 +6,7 @@
 2. [描述](#描述)
 3. [安装说明](#安装说明)
 4. [使用说明](#使用说明)
-  *  [主机列表文件(/etc/hosts_list)格式说明](#主机列表文件(/etc/hhdp_hosts)格式说明)
+  *  [主机列表文件(/etc/hosts_list)格式说明](#主机列表文件(/etc/hosts_list)格式说明)
   *  [命令具体使用](#命令具体使用)
 5. [目前问题](#目前问题)
 
@@ -27,6 +27,16 @@
     apt-get -y install rsync python-paramiko python-pexpect
   Redhat/CentOS:
     yum -y install rsync python-paramiko python-pexpect
+  低版本向高版本兼容：
+  * 安装最新pip:
+  curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py; python get-pip.py
+  * 安装库文件:
+  Ubuntu:
+    apt-get install build-essential libssl-dev libffi-dev python-dev
+  Redhat/CentOs:
+    yum install gcc libffi-devel python-devel openssl-devel
+  * 安装paramiko  
+    pip install paramiko
 2. 获取代码:
   git clone https://github.com/bw-y/hhdp.git
   chmod 755 hhdp.py && mkdir -v /usr/local/hhdp
@@ -39,9 +49,9 @@
 
 ## 使用说明
   
-### 主机列表文件(/etc/hhdp_hosts)格式说明
+### 主机列表文件(/etc/hosts_list)格式说明
 
-  * 此文件默认路径: /etc/hhdp_hosts
+  * 此文件默认路径: /etc/hosts_list
   * 支持注释,任意行首`#`时,此行内容不被读取
   * 文件每行定义一个主机相关信息(ip,port,user,passwd,pkey),其中pkey为ssh使用key认证时,私钥文件的绝对路径
   * 每行多个字段之间以一个空格隔开,字段内容由冒号定义属性. 例如: `ip:192.168.1.10 port:22 pkey:/opt/id_rsa`
@@ -55,7 +65,7 @@
 #### 例: 一个完成的主机列表文件如下
 
 ```
-# cat /etc/hhdp_hosts 
+# cat /etc/hosts_list
 ip:192.168.5.22 user:bw-y
 ip:192.168.5.12 passwd:redhat
 ip:lab.bw-y.com
