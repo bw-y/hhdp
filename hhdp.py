@@ -197,14 +197,14 @@ class DoIt(object):
             load_key = paramiko.RSAKey.from_private_key_file(self.pkey)
             try:
                 ssh_conn.connect(self.ip, self.port, self.user, pkey=load_key)
-            except paramiko.SSHException:
-                self._output("%s ssh connect failed\n" % self.ip)
+            except:
+                self._output("ssh -p %s %s@%s connect failed\n" % (self.port, self.user, self.ip))
                 return
         else:
             try:
                 ssh_conn.connect(self.ip, self.port, self.user, self.passwd)
-            except paramiko.SSHException:
-                self._output("%s ssh connect failed\n" % self.ip)
+            except:
+                self._output("ssh -p %s %s@%s %s connect failed\n" % (self.port, self.user, self.ip, self.passwd))
                 return
         stdin, stdout, stderr = ssh_conn.exec_command(str(self.map["cmd"]))
         self._output(stdout.read() + stderr.read())
@@ -402,5 +402,5 @@ class Tools(object):
 
 if __name__ == '__main__':
     instance = Base('/etc/hosts_list', sys.argv)
-    work_manager = WorkManager(instance, 15)
+    work_manager = WorkManager(instance, 10)
     work_manager.wait_all_complete()
