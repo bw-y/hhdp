@@ -142,8 +142,8 @@ docker b2c08b9857557daeb960752600c0cc91  /tmp/file2
 
 ## FAQ
 ### 线程过多时出现异常,目前查到是由于setuptools/pip/paramiko部分版本又冲突导致,解决如下:
-`
+```
 # pip install -U pip
 # pip uninstall setuptools
 # pip install 'setuptools<20.2'
-`
+```
