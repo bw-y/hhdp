@@ -8,7 +8,7 @@
 4. [使用说明](#使用说明)
   *  [主机列表文件(/etc/hosts_list)格式说明](#主机列表文件(/etc/hosts_list)格式说明)
   *  [命令具体使用](#命令具体使用)
-5. [目前问题](#目前问题)
+5. [FAQ](#FAQ)
 
 ## 简介
 
@@ -140,6 +140,10 @@ docker b2c08b9857557daeb960752600c0cc91  /tmp/file2
 /opt/dir/ => 192.168.5.15:/tmp/dir/ 2015/10/07 00:14:18 -> 00:14:21 ok
 ```
 
-## 目前问题
-### 线程数量过多会导致SSH相关异常,目前暂未找到更好的解决方法.
-
+## FAQ
+### 线程过多时出现异常,目前查到是由于setuptools/pip/paramiko部分版本又冲突导致,解决如下:
+`
+# pip install -U pip
+# pip uninstall setuptools
+# pip install 'setuptools<20.2'
+`
