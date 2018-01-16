@@ -7,7 +7,7 @@ import paramiko
 import logging
 
 from subprocess import Popen, PIPE
-from time import strftime, localtime
+from time import strftime, localtime, sleep
 from threading import Thread, Lock
 from Queue import Queue
 from pexpect import run as prun
@@ -356,6 +356,7 @@ class Work(Thread):
     def run(self):
         """ 执行任务直到队列为空. """
         while True:
+            sleep(1)
             if Work._thread_lock.acquire():
                 if self.work_queue.empty():
                     Work._thread_lock.release()
