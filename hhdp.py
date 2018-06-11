@@ -237,7 +237,7 @@ class DoIt(object):
         else:
             _args = '"ssh -p %s -q -o StrictHostKeyChecking=no"' % self.port
             _command = '%s %s %s %s@%s:%s' % (_cmd, _args, _src, _user, _ip, _dst)
-            (_output, _return_code) = prun(_command, withexitstatus=True, events={'password': '%s\n' % self.passwd})
+            (_output, _return_code) = prun(_command, withexitstatus=True, events={'.*assword': '%s\n' % self.passwd})
             self.sync_ctrl_fail_info(_return_code, _output, _start)
 
     def run(self):
