@@ -214,11 +214,11 @@ class DoIt(object):
     def sync_ctrl_fail_info(_code, _info="Nothing", _start="Nothing"):
         """ 文件同步方法的输出方法(复用和加锁). """
         if DoIt._output_lock.acquire():
-            if int(_code) == 0:
-                sys.stdout.write("%s %s ok\n" % (_start, Tools.now_time()))
-            else:
+            if _code is None or int(_code) != 0:
                 sys.stdout.write("%s %s failed\n" % (_start, Tools.now_time()))
                 sys.stdout.write(_info + "\n")
+            else:
+                sys.stdout.write("%s %s ok\n" % (_start, Tools.now_time()))
             DoIt._output_lock.release()
 
     def sync_ctrl(self):
